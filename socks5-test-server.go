@@ -377,7 +377,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logWrite(blue + fmtHex(localAddr) + reset + gray + " ("+localAddr.String()+")" + reset)
+	logWrite(blue + fmtHex(localAddr) + reset + gray + " (" + localAddr.String() + ")" + reset)
 	written, e = c.Write(localAddr)
 	if e != nil {
 		log1(e.Error())
@@ -389,7 +389,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logWrite(blue + fmtHex(localPortBytes) + reset + gray + " ("+strconv.Itoa(int(localPortUint16))+")" + reset)
+	logWrite(blue + fmtHex(localPortBytes) + reset + gray + " (" + strconv.Itoa(int(localPortUint16)) + ")" + reset)
 	written, e = c.Write(localPortBytes)
 	if e != nil {
 		log1(e.Error())
@@ -404,24 +404,21 @@ func handle(c net.Conn) {
 	log("forwarding data...")
 
 	defer func() { _ = conn.Close() }()
-	if e = pipe(c, conn); e != nil {
-		switch {
-		case errors.Is(e, io.EOF):
-			finished = true
-			log0("EOF")
-			return
-		case e == nil:
-			finished = true
-			return
-		default:
-			log1(e.Error())
-			return
-		}
+	var totalRead, totalWritten int
+	totalRead, totalWritten, e = pipe(c, conn)
+	switch {
+	case errors.Is(e, io.EOF):
+		finished = true
+		log0("EOF")
+	case e == nil:
+		finished = true
+	default:
+		log1(e.Error())
 	}
-	finished = true
+	log("total read: "+strconv.Itoa(totalRead)+", total written: "+strconv.Itoa(totalWritten))
 }
 
-func pipe(socksClient net.Conn, target net.Conn) error {
+func pipe(socksClient net.Conn, target net.Conn) (totalRead int, totalWritten int, err error) {
 	defer func() { _ = target.Close() }()
 	// caller closes socksClient
 	// defer func() { _ = socksClient.Close() }()
@@ -431,6 +428,9 @@ func pipe(socksClient net.Conn, target net.Conn) error {
 	eChan := make(chan error, 2)
 
 	ctx, cancel := context.WithCancel(context.Background())
+
+	totalRead = 0
+	totalWritten = 0
 
 	go func() {
 		defer cancel()
@@ -450,6 +450,9 @@ func pipe(socksClient net.Conn, target net.Conn) error {
 				eChan <- io.EOF
 				return
 			}
+
+			totalRead += n
+
 			_, e = socksClient.Write(inBuf[:n])
 			if e != nil {
 				eChan <- e
@@ -476,18 +479,22 @@ func pipe(socksClient net.Conn, target net.Conn) error {
 				eChan <- io.EOF
 				return
 			}
-			_, e = target.Write(outBuf[:n])
+
+			n, e = target.Write(outBuf[:n])
+			totalWritten += n
+
 			if e != nil {
 				eChan <- e
+				return
 			}
 		}
 	}()
 
 	select {
 	case e := <-eChan:
-		return e
+		return totalRead, totalWritten, e
 	case <-ctx.Done():
-		return nil
+		return totalRead, totalWritten, nil
 	}
 }
 
