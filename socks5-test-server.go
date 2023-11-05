@@ -338,7 +338,23 @@ func handle(c net.Conn) {
 
 	logRead("\ttarget addr: " + blue + target.String())
 
-	port := uint16(buf[head]) | uint16(buf[head+1])
+	portSlice := []byte{buf[head], buf[head+1]}
+	var port uint16
+	for i := range portSlice {
+		if portSlice[i] < 0 || portSlice[i] > 255 {
+            log1("bad port")
+            dump(buf[head:])
+            logWrite(red + "0x00" + reset + gray + " (bad port)")
+            _, _ = c.Write([]byte{0x05, 0x00})
+            _ = c.Close()
+            return
+        }
+		if i == 0 {
+			port = uint16(portSlice[i])
+		} else {
+			port = port<<8 | uint16(portSlice[i])
+		}
+	}
 
 	logRead("\ttarget port: " + blue + strconv.Itoa(int(port)))
 
