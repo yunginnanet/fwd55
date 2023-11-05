@@ -324,7 +324,7 @@ func handle(c net.Conn) {
 	if buf[head] != 0x01 {
 		log1("bad address type, only ipv4 address supported")
 		dump(buf[head:])
-		log0("responding with 0x08 (bad address type)")
+		logWrite(red + "0x08" + reset + gray +" (bad address type)" + reset)
 		_, _ = c.Write([]byte{0x05, 0x08})
 		_ = c.Close()
 		return
