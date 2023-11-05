@@ -149,7 +149,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logRead("SOCKS version: " + green + "5" + reset)
+	logRead("SOCKS version: " + blue + "5" + reset)
 
 	numMethods := int(buf[1])
 	if numMethods < 1 {
@@ -232,6 +232,7 @@ func handle(c net.Conn) {
 		}
 		if r < 1 {
 			println("short read")
+			dump(buf)
 			_ = c.Close()
 			return
 		}
@@ -245,8 +246,9 @@ func handle(c net.Conn) {
 	if !authMethods["supports auth anonymous: "] {
 		log1("does not support anonymous auth")
 		// 0xff no acceptable auth methods
-		logWrite(red + "0xff (no acceptable auth methods)" + reset)
-		_, _ = c.Write([]byte{0x05, 0xff})
+		resp := []byte{0x05, 0xff}
+		logWrite(red + fmtHex(resp) + reset + gray + " (no acceptable auth methods)" + reset)
+		_, _ = c.Write(resp)
 		_ = c.Close()
 		return
 	}
@@ -281,25 +283,25 @@ func handle(c net.Conn) {
 
 	if r < 10 {
 		log1("short read")
-		dump(buf[:head+])
+		dump(buf[:head+r])
 		_ = c.Close()
 		return
 	}
 
 	if buf[head] != 0x05 {
 		log1("bad version")
-		dump(buf)
+		dump(buf[head:])
 		_ = c.Close()
 		return
 	}
-	
-	logRead("SOCKS version: " + green + "5" + reset)
+
+	logRead("\tSOCKS version: " + blue + "5" + reset)
 
 	head++
 
 	if buf[head] != 0x01 {
 		log1("bad command")
-		dump(buf)
+		dump(buf[head:])
 		_ = c.Close()
 		return
 	}
@@ -310,7 +312,7 @@ func handle(c net.Conn) {
 
 	if buf[head] != 0x00 {
 		log1("reserved header not zero")
-		dump(buf)
+		dump(buf[head:])
 		_ = c.Close()
 		return
 	}
@@ -321,7 +323,7 @@ func handle(c net.Conn) {
 
 	if buf[head] != 0x01 {
 		log1("bad address type, only ipv4 address supported")
-		dump(buf)
+		dump(buf[head:])
 		log0("responding with 0x08 (bad address type)")
 		_, _ = c.Write([]byte{0x05, 0x08})
 		_ = c.Close()
@@ -345,6 +347,7 @@ func handle(c net.Conn) {
 	ap, err := netip.ParseAddrPort(targetStr)
 	if err != nil {
 		log1(err.Error())
+		dump(buf[head:])
 		log0("{0x05,0x01} (general failure)")
 		_, _ = c.Write([]byte{0x05, 0x01})
 		_ = c.Close()
@@ -357,7 +360,8 @@ func handle(c net.Conn) {
 	var conn net.Conn
 	if conn, e = net.DialTimeout("tcp", targetHost, time.Duration(5)*time.Second); e != nil {
 		log1("\t" + e.Error())
-		logWrite(red + "0x01 (general failure)" + reset)
+		dump(buf[head:])
+		logWrite(red + "0x01 " + reset + gray + " (general failure)" + reset)
 		_, _ = c.Write([]byte{0x05, 0x01})
 		_ = c.Close()
 		return
@@ -368,7 +372,7 @@ func handle(c net.Conn) {
 	localPortUint16 := uint16(c.LocalAddr().(*net.TCPAddr).Port)
 	localPortBytes := []byte{byte(localPortUint16 >> 8), byte(localPortUint16)}
 
-	logWrite(green + "{0x05, 0x00, 0x00, 0x01} (success)" + reset)
+	logWrite(green + "{0x05, 0x00, 0x00, 0x01} " + reset + gray + " (success)" + reset)
 	written, e = c.Write([]byte{0x05, 0x00, 0x00, 0x01})
 	if e != nil {
 		log1(e.Error())
@@ -417,7 +421,7 @@ func handle(c net.Conn) {
 	default:
 		log1(e.Error())
 	}
-	log("total read: "+strconv.Itoa(totalRead)+", total written: "+strconv.Itoa(totalWritten))
+	log("total read: " + strconv.Itoa(totalRead) + ", total written: " + strconv.Itoa(totalWritten))
 }
 
 func pipe(socksClient net.Conn, target net.Conn) (totalRead int, totalWritten int, err error) {
