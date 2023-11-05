@@ -1,5 +1,36 @@
 package main
 
+// ▄─▄  ▄ ▄ ▄  ──▄  ▄─▄  ▄─▄
+// ▓─   ▓ ▓ ▓  ▓ ▓  ▀─▄  ▀─▄
+// ▀    ▀─▀─▀  ──▀  ▀─▀  ▀─▀
+//          fwd55
+//
+// simple rfc1928 proxy server
+//
+//
+// valid usecases:
+//	- learning
+//	- debugging
+//	- hoodrat stuff
+//
+// invalid usecases:
+//	- anything important
+//
+//
+// author:
+//	twitter.com/yunginnanet
+//	github.com/yunginnanet
+//	git.tcp.direct/kayos
+//	ircs://ircd.chat/tcpdirect
+//
+//
+// ---------------------------------
+//
+// usage: ./fwd55 <listen>
+//   e.g: ./fwd55 127.0.0.1 1080
+//
+// ---------------------------------
+
 import (
 	"context"
 	"encoding/binary"
@@ -16,8 +47,6 @@ import (
 )
 
 func main() {
-	_, _ = os.Stdout.WriteString(string(net.ParseIP("127.0.0.1").To4()))
-	_, _ = os.Stdout.Write([]byte{'\n'})
 	serve()
 }
 
@@ -487,7 +516,7 @@ func handle(c net.Conn) {
 		_, _ = os.Stderr.WriteString(red + " ERR " + reset + "\n")
 		log1(e.Error())
 	}
-	log0("bytes read: " + strconv.Itoa(totalRead) + "\tbytes written: " + strconv.Itoa(totalWritten))
+	log0(gray + "bytes read: " + strconv.Itoa(totalRead) + "\tbytes written: " + strconv.Itoa(totalWritten))
 	log("")
 }
 
