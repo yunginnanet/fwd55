@@ -149,7 +149,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logRead("SOCKS version: " + blue + "5" + reset)
+	logRead("SOCKS version: " + blue + "5")
 
 	numMethods := int(buf[1])
 	if numMethods < 1 {
@@ -247,14 +247,14 @@ func handle(c net.Conn) {
 		log1("does not support anonymous auth")
 		// 0xff no acceptable auth methods
 		resp := []byte{0x05, 0xff}
-		logWrite(red + fmtHex(resp) + reset + gray + " (no acceptable auth methods)" + reset)
+		logWrite(red + fmtHex(resp) + gray + " (no acceptable auth methods)")
 		_, _ = c.Write(resp)
 		_ = c.Close()
 		return
 	}
 
 	resp := []byte{0x05, 0x00}
-	logWrite(green + fmtHex(resp) + reset + gray + " (successful auth)" + reset)
+	logWrite(green + fmtHex(resp) + gray + " (successful auth)")
 
 	written, e := c.Write(resp)
 	if e != nil {
@@ -295,7 +295,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logRead("\tSOCKS version: " + blue + "5" + reset)
+	logRead("\tSOCKS version: " + blue + "5")
 
 	head++
 
@@ -306,7 +306,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logRead("\tcommand: " + blue + "connect" + reset)
+	logRead("\tcommand: " + blue + "connect")
 
 	head++
 
@@ -317,14 +317,14 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logRead("\treserved header: " + blue + "0x00" + reset)
+	logRead("\treserved header: " + blue + "0x00")
 
 	head++
 
 	if buf[head] != 0x01 {
 		log1("bad address type, only ipv4 address supported")
 		dump(buf[head:])
-		logWrite(red + "0x08" + reset + gray +" (bad address type)" + reset)
+		logWrite(red + "0x08" + reset + gray +" (bad address type)")
 		_, _ = c.Write([]byte{0x05, 0x08})
 		_ = c.Close()
 		return
@@ -336,11 +336,11 @@ func handle(c net.Conn) {
 
 	head += 5
 
-	logRead("\ttarget addr: " + blue + target.String() + reset)
+	logRead("\ttarget addr: " + blue + target.String())
 
 	port := uint16(buf[head]) | uint16(buf[head+1])
 
-	logRead("\ttarget port: " + blue + strconv.Itoa(int(port)) + reset)
+	logRead("\ttarget port: " + blue + strconv.Itoa(int(port)))
 
 	targetStr := target.String() + ":" + strconv.Itoa(int(port))
 
@@ -361,7 +361,7 @@ func handle(c net.Conn) {
 	if conn, e = net.DialTimeout("tcp", targetHost, time.Duration(5)*time.Second); e != nil {
 		log1("\t" + e.Error())
 		dump(buf[head:])
-		logWrite(red + "0x01 " + reset + gray + " (general failure)" + reset)
+		logWrite(red + "0x01 " + reset + gray + " (general failure)")
 		_, _ = c.Write([]byte{0x05, 0x01})
 		_ = c.Close()
 		return
@@ -372,7 +372,7 @@ func handle(c net.Conn) {
 	localPortUint16 := uint16(c.LocalAddr().(*net.TCPAddr).Port)
 	localPortBytes := []byte{byte(localPortUint16 >> 8), byte(localPortUint16)}
 
-	logWrite(green + "{0x05, 0x00, 0x00, 0x01} " + reset + gray + " (success)" + reset)
+	logWrite(green + "{0x05, 0x00, 0x00, 0x01} " + reset + gray + " (success)")
 	written, e = c.Write([]byte{0x05, 0x00, 0x00, 0x01})
 	if e != nil {
 		log1(e.Error())
@@ -383,7 +383,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logWrite(blue + fmtHex(localAddr) + reset + gray + " (" + localAddr.String() + ")" + reset)
+	logWrite(blue + fmtHex(localAddr) + reset + gray + " (" + localAddr.String() + ")")
 	written, e = c.Write(localAddr)
 	if e != nil {
 		log1(e.Error())
@@ -395,7 +395,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logWrite(blue + fmtHex(localPortBytes) + reset + gray + " (" + strconv.Itoa(int(localPortUint16)) + ")" + reset)
+	logWrite(blue + fmtHex(localPortBytes) + reset + gray + " (" + strconv.Itoa(int(localPortUint16)) + ")")
 	written, e = c.Write(localPortBytes)
 	if e != nil {
 		log1(e.Error())
