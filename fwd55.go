@@ -3,7 +3,7 @@ package main
 // ▄─▄  ▄ ▄ ▄  ──▄  ▄─▄  ▄─▄
 // ▓─   ▓ ▓ ▓  ▓ ▓  ▀─▄  ▀─▄
 // ▀    ▀─▀─▀  ──▀  ▀─▀  ▀─▀
-//          fwd55
+//      f w d  -->  5 5
 //
 // simple rfc1928 proxy server
 //
