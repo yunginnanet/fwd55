@@ -251,9 +251,10 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logWrite(green + "0x00 (auth method good, go ahead)" + reset)
+	resp := []byte{0x05, 0x00}
+	logWrite(green + fmtHex(resp) + reset + gray + " (successful auth)" + reset)
 
-	written, e := c.Write([]byte{0x05, 0x00})
+	written, e := c.Write(resp)
 	if e != nil {
 		log1(e.Error())
 		_ = c.Close()
