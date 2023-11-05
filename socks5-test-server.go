@@ -116,7 +116,7 @@ func handle(c net.Conn) {
 		return len(p), nil
 	}}
 
-	log("-----------------------------------------------")
+	log(gray + "-----------------------------------------------")
 
 	log("connection established", startPrefix)
 	log("")
