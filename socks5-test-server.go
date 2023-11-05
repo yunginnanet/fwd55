@@ -360,10 +360,11 @@ func handle(c net.Conn) {
 
 	var conn net.Conn
 	if conn, e = net.DialTimeout("tcp", targetHost, time.Duration(5)*time.Second); e != nil {
-		log1("\t" + e.Error())
-		dump(buf[head:])
-		logWrite(red + "0x01 " + reset + gray + " (general failure)")
-		_, _ = c.Write([]byte{0x05, 0x01})
+		_, _ = os.Stderr.Write([]byte(red + "failed" + reset + "\n"))
+		log1(e.Error())
+		errResp := []byte{0x05, 0x01}
+		logWrite(red + fmtHex(errResp) + reset + gray + " (general failure)")
+		_, _ = c.Write(errResp)
 		_ = c.Close()
 		return
 	}
