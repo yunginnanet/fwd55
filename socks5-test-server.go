@@ -281,7 +281,7 @@ func handle(c net.Conn) {
 
 	if r < 10 {
 		log1("short read")
-		dump(buf[:r])
+		dump(buf[:head+])
 		_ = c.Close()
 		return
 	}
@@ -292,6 +292,8 @@ func handle(c net.Conn) {
 		_ = c.Close()
 		return
 	}
+	
+	logRead("SOCKS version: " + green + "5" + reset)
 
 	head++
 
