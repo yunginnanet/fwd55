@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -51,17 +52,19 @@ const (
 	green       = "\033[32m"
 	gray        = "\033[90m"
 	reset       = "\033[0m"
-	errPrefix   = red + "(ABORT) "
+	errPrefix   = red + "(FATAL) "
 	warnPrefix  = orange + "(WARN!️️) " + reset
 	startPrefix = green + "(START) " + reset
 	closePrefix = red + "(CLOSE) " + reset
-	infoPrefix  = gray + "(DEBUG️) " + reset
+	infoPrefix  = gray + "(DEBUG) " + reset
 	writePrefix = yellow + "(W--->)" + reset
 	readPrefix  = purple + "(<---R)" + reset
 	finPrefix   = green + "(FINAL) " + reset
 )
 
 func handle(c net.Conn) {
+	_ = c.SetDeadline(time.Now().Add(time.Duration(5) * time.Second))
+
 	log := func(s string, isErr ...string) {
 		dest := os.Stderr
 		prefix := "[" + c.RemoteAddr().String() + "]\t"
@@ -89,7 +92,7 @@ func handle(c net.Conn) {
 	}
 
 	logWrite := func(s string) {
-		log("write: "+s, writePrefix)
+		log(s, writePrefix)
 	}
 
 	log1 := func(s string) {
@@ -113,11 +116,14 @@ func handle(c net.Conn) {
 		return len(p), nil
 	}}
 
-	log("connected", startPrefix)
+	log("-----------------------------------------------")
+
+	log("connection established", startPrefix)
+	log("")
 
 	defer logFin("connection closed")
 
-	log("reading 2 bytes of protocol negotiation data:")
+	log(gray + "reading 2 bytes of protocol negotiation data...")
 
 	buf := make([]byte, 2)
 	var r int
@@ -142,16 +148,23 @@ func handle(c net.Conn) {
 		return
 	}
 
-	if buf[0] != 0x05 {
+	head := 0
+
+	if buf[head] != 0x05 {
 		log1("bad version")
 		dump(buf)
 		_ = c.Close()
 		return
 	}
 
-	logRead("SOCKS version: " + blue + "5")
+	logRead("\tproto version:\t" +
+		blue + "0x" + hex.EncodeToString([]byte{buf[head]}) +
+		reset + gray + "\t(int: " + strconv.Itoa(int(buf[head])) + ")",
+	)
 
-	numMethods := int(buf[1])
+	head++
+
+	numMethods := int(buf[head])
 	if numMethods < 1 {
 		log1("no methods")
 		dump(buf)
@@ -165,22 +178,26 @@ func handle(c net.Conn) {
 		return
 	}
 
-	head := 1
+	logRead("\tauth offer ct:\t" +
+		blue + "0x" + hex.EncodeToString([]byte{buf[head]}) +
+		reset + gray + "\t(int: " + strconv.Itoa(int(buf[head])) + ")",
+	)
+	log("")
 
 	if buf[head] > 1 {
-		log("more than one method (" + strconv.Itoa(int(buf[1])) + "), expanding buffer...")
+		log(gray + "expanding buffer for auth methods...")
 		buf = append(buf, make([]byte, numMethods)...)
 	}
 
 	var authMethods = map[string]bool{
-		"supports auth anonymous: ": false,
-		"supports auth gssapi: ":    false,
-		"supports auth user/pass: ": false,
+		"anonymous": false,
+		"gss-api":   false,
+		"user/pass": false,
 	}
 
 	updateAuthMethods := func(b byte) {
-		logRead("\tauth method byte += " + blue + "0x" + hex.EncodeToString([]byte{b}) +
-			reset + gray + " (int: " + strconv.Itoa(int(b)) + ")" + reset)
+		logRead("\tauth methods +=\t" + blue + "0x" + hex.EncodeToString([]byte{b}) +
+			reset + gray + "\t(int: " + strconv.Itoa(int(b)) + ")" + reset)
 		switch {
 		case b > 0x02:
 			switch {
@@ -196,11 +213,11 @@ func handle(c net.Conn) {
 		default:
 			switch b {
 			case 0x00:
-				authMethods["supports auth anonymous: "] = true
+				authMethods["anonymous"] = true
 			case 0x01:
-				authMethods["supports auth gssapi: "] = true
+				authMethods["gss-api"] = true
 			case 0x02:
-				authMethods["supports auth user/pass: "] = true
+				authMethods["user/pass"] = true
 			default:
 				log2("unknown auth method: " + strconv.Itoa(int(b)))
 			}
@@ -208,17 +225,19 @@ func handle(c net.Conn) {
 	}
 
 	printAuthMethods := func() {
-		hdr := "--- client auth methods offered ---"
-		log("\t" + hdr)
+		log("")
+		hdr := gray + "----- client auth methods -----"
+		log(hdr)
 		var res = "N/A"
 		for k, v := range authMethods {
 			res = red + strconv.FormatBool(v) + reset
 			if v {
 				res = green + strconv.FormatBool(v) + reset
 			}
-			log0("\t" + k + res)
+			log0("   " + k + ":\t\t" + res)
 		}
-		log("\t" + strings.Repeat("-", len(hdr)))
+		log(gray + strings.Repeat("-", len(hdr)-5))
+		log("")
 	}
 
 	miniBuf := make([]byte, 1)
@@ -243,7 +262,7 @@ func handle(c net.Conn) {
 
 	printAuthMethods()
 
-	if !authMethods["supports auth anonymous: "] {
+	if !authMethods["anonymous"] {
 		log1("does not support anonymous auth")
 		// 0xff no acceptable auth methods
 		resp := []byte{0x05, 0xff}
@@ -254,7 +273,8 @@ func handle(c net.Conn) {
 	}
 
 	resp := []byte{0x05, 0x00}
-	logWrite(green + fmtHex(resp) + gray + " (successful auth)")
+	logWrite(green + fmtHex(resp) + gray + "\t(successful auth)")
+	log("")
 
 	written, e := c.Write(resp)
 	if e != nil {
@@ -269,7 +289,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	log("reading 10 bytes of request data...")
+	log(gray + "reading 10 bytes of request data...")
 
 	buf = append(buf, make([]byte, 10)...)
 
@@ -295,7 +315,10 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logRead("\tSOCKS version: " + blue + "5")
+	logRead("\tproto version:\t" +
+		blue + "0x" + hex.EncodeToString([]byte{buf[head]}) +
+		reset + gray + "\t(int: " + strconv.Itoa(int(buf[head])) + ")",
+	)
 
 	head++
 
@@ -306,7 +329,10 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logRead("\tcommand: " + blue + "connect")
+	logRead("\tcommand:\t" +
+		blue + "0x" + hex.EncodeToString([]byte{buf[head]}) +
+		reset + gray + "\t(int: " + strconv.Itoa(int(buf[head])) + ") (connect)",
+	)
 
 	head++
 
@@ -317,15 +343,17 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logRead("\treserved header: " + blue + "0x00")
+	logRead(gray + "\treserved:\t" + blue + "0x" + hex.EncodeToString([]byte{buf[head]}))
+	log("")
 
 	head++
 
 	if buf[head] != 0x01 {
 		log1("bad address type, only ipv4 address supported")
 		dump(buf[head:])
-		logWrite(red + "0x08" + reset + gray + " (bad address type)")
-		_, _ = c.Write([]byte{0x05, 0x08})
+		resp := []byte{0x05, 0x08}
+		logWrite(red + fmtHex(resp) + reset + gray + " (bad address type)")
+		_, _ = c.Write(resp)
 		_ = c.Close()
 		return
 	}
@@ -334,9 +362,15 @@ func handle(c net.Conn) {
 		buf[head+1], buf[head+2], buf[head+3], buf[head+4],
 	}
 
-	head += 5
+	logRead("\ttarget addr:\t" +
+		blue + fmtHex([]byte(target)),
+	)
+	log("\t\t" + gray + "   \\--> (int: " +
+		strconv.Itoa(int(binary.BigEndian.Uint32(target))) +
+		") (" + target.String() + ")",
+	)
 
-	logRead("\ttarget addr: " + blue + target.String())
+	head += 5
 
 	portSlice := []byte{buf[head], buf[head+1]}
 	var port uint16
@@ -357,7 +391,8 @@ func handle(c net.Conn) {
 		}
 	}
 
-	logRead("\ttarget port: " + blue + strconv.Itoa(int(port)))
+	logRead("\ttarget port:\t" + blue + fmtHex(portSlice))
+	log("\t\t" + gray + "   \\--> (int: " + strconv.Itoa(int(port)) + ")")
 
 	targetStr := target.String() + ":" + strconv.Itoa(int(port))
 
@@ -373,11 +408,15 @@ func handle(c net.Conn) {
 	}
 	targetHost := ap.String()
 
-	log("connecting to "+targetHost+"... ", "")
+	log("")
+	log(gray + "beginning connection to target host...")
+
+	log("\tconnecting to "+targetHost+"... ", "")
 
 	var conn net.Conn
 	if conn, e = net.DialTimeout("tcp", targetHost, time.Duration(5)*time.Second); e != nil {
 		_, _ = os.Stderr.Write([]byte(red + "failed" + reset + "\n"))
+		log("")
 		log1(e.Error())
 		errResp := []byte{0x05, 0x01}
 		logWrite(red + fmtHex(errResp) + reset + gray + " (general failure)")
@@ -386,13 +425,16 @@ func handle(c net.Conn) {
 		return
 	}
 
-	_, _ = os.Stderr.Write([]byte(green + "success" + reset + "\n"))
+	_, _ = os.Stderr.Write([]byte(green + "success!" + reset + "\n"))
+	log("")
+
 	localAddr := c.LocalAddr().(*net.TCPAddr).IP.To4()
 	localPortUint16 := uint16(c.LocalAddr().(*net.TCPAddr).Port)
 	localPortBytes := []byte{byte(localPortUint16 >> 8), byte(localPortUint16)}
 
-	logWrite(green + "{0x05, 0x00, 0x00, 0x01} " + reset + gray + " (success)")
-	written, e = c.Write([]byte{0x05, 0x00, 0x00, 0x01})
+	resp = []byte{0x05, 0x00, 0x00, 0x01}
+	logWrite(green + fmtHex(resp) + reset + gray + " (success)")
+	written, e = c.Write(resp)
 	if e != nil {
 		log1(e.Error())
 		return
@@ -402,7 +444,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logWrite(blue + fmtHex(localAddr) + reset + gray + " (" + localAddr.String() + ")")
+	logWrite(blue + fmtHex(localAddr) + reset + gray + " (my addr: " + localAddr.String() + ")")
 	written, e = c.Write(localAddr)
 	if e != nil {
 		log1(e.Error())
@@ -414,8 +456,11 @@ func handle(c net.Conn) {
 		return
 	}
 
-	logWrite(blue + fmtHex(localPortBytes) + reset + gray + " (" + strconv.Itoa(int(localPortUint16)) + ")")
+	logWrite(blue + fmtHex(localPortBytes) + reset + gray + "\t\t (my port: " + strconv.Itoa(int(localPortUint16)) + ")")
+	log("")
+
 	written, e = c.Write(localPortBytes)
+
 	if e != nil {
 		log1(e.Error())
 		return
@@ -426,7 +471,7 @@ func handle(c net.Conn) {
 		return
 	}
 
-	log("forwarding data...")
+	log(gray+"beginning proxy i/o goroutines...", "")
 
 	defer func() { _ = conn.Close() }()
 	var totalRead, totalWritten int
@@ -434,13 +479,16 @@ func handle(c net.Conn) {
 	switch {
 	case errors.Is(e, io.EOF):
 		finished = true
-		log0("EOF")
+		_, _ = os.Stderr.WriteString(green + " EOF " + reset + "\n")
 	case e == nil:
 		finished = true
+		_, _ = os.Stderr.WriteString(green + " FIN " + reset + "\n")
 	default:
+		_, _ = os.Stderr.WriteString(red + " ERR " + reset + "\n")
 		log1(e.Error())
 	}
-	log("total read: " + strconv.Itoa(totalRead) + ", total written: " + strconv.Itoa(totalWritten))
+	log0("bytes read: " + strconv.Itoa(totalRead) + "\tbytes written: " + strconv.Itoa(totalWritten))
+	log("")
 }
 
 func pipe(socksClient net.Conn, target net.Conn) (totalRead int, totalWritten int, err error) {
