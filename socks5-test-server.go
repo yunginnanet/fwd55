@@ -342,14 +342,14 @@ func handle(c net.Conn) {
 	var port uint16
 	for i := range portSlice {
 		if portSlice[i] < 0 || portSlice[i] > 255 {
-            log1("bad port")
-            dump(buf[head:])
-			resp := []byte{0x05,0x01}
-            logWrite(red + fmtHex(resp) + reset + gray + " (bad port)")
-            _, _ = c.Write(resp)
-            _ = c.Close()
-            return
-        }
+			log1("bad port")
+			dump(buf[head:])
+			resp := []byte{0x05, 0x01}
+			logWrite(red + fmtHex(resp) + reset + gray + " (bad port)")
+			_, _ = c.Write(resp)
+			_ = c.Close()
+			return
+		}
 		if i == 0 {
 			port = uint16(portSlice[i])
 		} else {
@@ -365,7 +365,7 @@ func handle(c net.Conn) {
 	if err != nil {
 		log1(err.Error())
 		dump(buf[head:])
-		resp := []byte{0x05,0x01}
+		resp := []byte{0x05, 0x01}
 		logWrite(red + fmtHex(resp) + reset + gray + " (general failure)")
 		_, _ = c.Write(resp)
 		_ = c.Close()
