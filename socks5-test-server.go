@@ -344,8 +344,9 @@ func handle(c net.Conn) {
 		if portSlice[i] < 0 || portSlice[i] > 255 {
             log1("bad port")
             dump(buf[head:])
-            logWrite(red + "0x00" + reset + gray + " (bad port)")
-            _, _ = c.Write([]byte{0x05, 0x00})
+			resp := []byte{0x05,0x01}
+            logWrite(red + fmtHex(resp) + reset + gray + " (bad port)")
+            _, _ = c.Write(resp)
             _ = c.Close()
             return
         }
