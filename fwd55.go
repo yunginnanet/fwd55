@@ -213,7 +213,7 @@ func handle(c net.Conn) {
 	)
 	log("")
 
-	if buf[head] > 1 {
+	if buf[head] >= 1 {
 		log(gray + "expanding buffer for auth methods...")
 		buf = append(buf, make([]byte, numMethods)...)
 	}
