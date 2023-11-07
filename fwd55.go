@@ -15,7 +15,11 @@ package main
 //
 // invalid usecases:
 //	- anything important
-//
+// why?
+//      - no signficant testing
+//      - no authentication
+//      - not fully RFC compliant (yet)
+//      - only supports CONNECT
 //
 // author:
 //	twitter.com/yunginnanet
