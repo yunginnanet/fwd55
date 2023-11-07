@@ -86,7 +86,7 @@ const (
 	gray        = "\033[90m"
 	reset       = "\033[0m"
 	errPrefix   = red + "(FATAL) "
-	warnPrefix  = orange + "(WARN!️️) " + reset
+	warnPrefix  = orange + "(WARN!) " + reset
 	startPrefix = green + "(START) " + reset
 	closePrefix = red + "(CLOSE) " + reset
 	infoPrefix  = gray + "(DEBUG) " + reset
